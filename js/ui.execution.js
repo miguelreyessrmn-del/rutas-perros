@@ -9,6 +9,7 @@ const UIExecution = (function () {
   ];
   let watchId = null;
   let lastPosition = null;
+  let currentStopDest = null; // { lat, lon } — usado para refrescar el mini-mapa cuando llega una nueva posición GPS
 
   function sortedParadas(route) {
     return [...route.paradas].sort((a, b) => a.orden - b.orden);
@@ -59,6 +60,9 @@ const UIExecution = (function () {
       <div class="exec-owner">${esc(pet.owner || 'Sin propietario')}</div>
       <div class="exec-travel">📍 ${distKm} km · ⏱ ${durMin} min desde la parada anterior</div>
 
+      <div class="exec-map" id="exec-map"><span class="pet-thumb-fallback">🗺️</span></div>
+      <div id="exec-map-hint"></div>
+
       <div class="exec-call-row">
         ${pet.phone1 ? `<a class="btn-call" href="tel:${esc(pet.phone1)}">📞 Llamar</a>` : '<span class="btn-call" style="opacity:.4">📞 Sin teléfono</span>'}
         ${waPhone ? `<button class="btn-whatsapp" id="exec-wa-toggle" type="button">💬 WhatsApp</button>` : '<span class="btn-whatsapp" style="opacity:.4">💬 Sin WhatsApp</span>'}
@@ -104,6 +108,36 @@ const UIExecution = (function () {
 
     wireCurrentStopEvents(route, parada, lat, lon, waPhone, pet);
     hydratePhotos(pet);
+    currentStopDest = lat != null && lon != null ? { lat, lon } : null;
+    if (currentStopDest) renderExecMap(currentStopDest.lat, currentStopDest.lon);
+  }
+
+  // Mini-mapa con la posición del chofer + la parada actual y la ruta de manejo entre
+  // ambos. Referencia visual rápida; para navegación con voz se usa el botón "Navegar".
+  async function renderExecMap(destLat, destLon) {
+    const container = document.getElementById('exec-map');
+    if (!container) return;
+    if (!MapsService.isConfigured()) {
+      container.innerHTML = '<div class="hint-box">🗺️ Configura GOOGLE_MAPS_BROWSER_KEY para ver el mapa aquí.</div>';
+      return;
+    }
+    try {
+      const driverPos = lastPosition ? { lat: lastPosition.coords.latitude, lon: lastPosition.coords.longitude } : null;
+      const center = driverPos || { lat: destLat, lon: destLon };
+      await MapsService.createMap(container, { lat: center.lat, lng: center.lon });
+      const points = [{ lat: destLat, lon: destLon, label: 'Parada actual', status: 'current' }];
+      if (driverPos) points.push({ lat: driverPos.lat, lon: driverPos.lon, label: 'Tú', status: 'origin' });
+      MapsService.renderMarkers(points);
+      const hint = document.getElementById('exec-map-hint');
+      if (driverPos) {
+        await MapsService.drawDrivingRoute(driverPos, { lat: destLat, lon: destLon });
+        if (hint) hint.innerHTML = '';
+      } else if (hint) {
+        hint.innerHTML = '<div class="hint-box">Activa el seguimiento GPS para ver la ruta desde tu posición.</div>';
+      }
+    } catch (e) {
+      container.innerHTML = `<div class="hint-box">No se pudo cargar el mapa: ${esc(e.message)}</div>`;
+    }
   }
 
   function checklistItem(key, label, checklist) {
@@ -262,6 +296,7 @@ const UIExecution = (function () {
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
       lastPosition = null;
+      lastMapDriverPos = null;
       updateGpsStatusUI();
       return;
     }
@@ -270,11 +305,27 @@ const UIExecution = (function () {
       return;
     }
     watchId = navigator.geolocation.watchPosition(
-      (pos) => { lastPosition = pos; updateGpsStatusUI(); },
+      (pos) => {
+        lastPosition = pos;
+        updateGpsStatusUI();
+        maybeRefreshExecMap(pos);
+      },
       () => { updateGpsStatusUI('Permiso de ubicación denegado o GPS no disponible'); },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
     );
     updateGpsStatusUI();
+  }
+
+  // Evita recalcular la ruta de manejo en cada tick del GPS: solo si el chofer
+  // se movió lo suficiente desde el último cálculo (ahorra llamadas a Directions API).
+  let lastMapDriverPos = null;
+  function maybeRefreshExecMap(pos) {
+    if (!currentStopDest) return;
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    if (lastMapDriverPos && haversineMeters(lastMapDriverPos.lat, lastMapDriverPos.lon, lat, lon) < 40) return;
+    lastMapDriverPos = { lat, lon };
+    renderExecMap(currentStopDest.lat, currentStopDest.lon);
   }
 
   function updateGpsStatusUI(errorMsg) {

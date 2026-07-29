@@ -486,6 +486,13 @@ header {
 .exec-name { text-align:center; font-family:'Nunito',sans-serif; font-weight:900; font-size:1.3rem; color:var(--text); }
 .exec-owner { text-align:center; font-size:0.9rem; color:var(--text-mid); font-weight:700; margin-bottom:6px; }
 .exec-travel { text-align:center; font-size:0.8rem; color:var(--text-soft); font-family:'Nunito',sans-serif; font-weight:700; margin-bottom:14px; }
+.exec-map {
+  width:100%; height:180px; border-radius:var(--radius); margin-bottom:8px;
+  background:var(--sky-light); overflow:hidden; box-shadow:var(--card-shadow);
+  position:relative; color:var(--text-soft); font-size:1.6rem;
+}
+.exec-map:has(.hint-box) { display:flex; align-items:center; justify-content:center; }
+#exec-map-hint .hint-box { margin-top:0; margin-bottom:12px; }
 .exec-call-row { display:flex; gap:10px; margin-bottom:6px; }
 .exec-call-row .btn-call, .exec-call-row .btn-whatsapp { flex:1; border:none; cursor:pointer; font-family:'Nunito',sans-serif; }
 .exec-wa-templates { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
