@@ -130,8 +130,13 @@ const UIExecution = (function () {
       MapsService.renderMarkers(points);
       const hint = document.getElementById('exec-map-hint');
       if (driverPos) {
-        await MapsService.drawDrivingRoute(driverPos, { lat: destLat, lon: destLon });
         if (hint) hint.innerHTML = '';
+        try {
+          const result = await RouteService.computeRoute(driverPos, [{ id: 'dest', lat: destLat, lon: destLon }], false);
+          if (result.polyline) MapsService.drawPolyline(result.polyline);
+        } catch (e) {
+          // Sin línea de ruta si falla (p.ej. sin conexión); los marcadores siguen visibles.
+        }
       } else if (hint) {
         hint.innerHTML = '<div class="hint-box">Activa el seguimiento GPS para ver la ruta desde tu posición.</div>';
       }

@@ -6,8 +6,6 @@ const MapsService = (function () {
   let polyline = null;
   let infoWindow = null;
   let driverMarker = null;
-  let directionsService = null;
-  let directionsRenderer = null;
 
   function isConfigured() {
     return !!(window.PETGROUND_CONFIG && window.PETGROUND_CONFIG.GOOGLE_MAPS_BROWSER_KEY);
@@ -122,32 +120,6 @@ const MapsService = (function () {
     map.panTo({ lat, lng: lon });
   }
 
-  // Traza la ruta de manejo real entre dos puntos (para el mini-mapa de ejecución).
-  // No sustituye la navegación con voz de Google Maps — solo da referencia visual rápida.
-  async function drawDrivingRoute(origin, destination) {
-    const maps = await load();
-    if (!directionsService) directionsService = new maps.DirectionsService();
-    if (!directionsRenderer) directionsRenderer = new maps.DirectionsRenderer({ suppressMarkers: true, preserveViewport: true });
-    directionsRenderer.setMap(map);
-    return new Promise((resolve) => {
-      directionsService.route(
-        {
-          origin: { lat: origin.lat, lng: origin.lon },
-          destination: { lat: destination.lat, lng: destination.lon },
-          travelMode: maps.TravelMode.DRIVING
-        },
-        (result, status) => {
-          if (status === 'OK') {
-            directionsRenderer.setDirections(result);
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-        }
-      );
-    });
-  }
-
   // Street View embebido con fallback claro si no hay panorama cercano.
   async function renderStreetView(container, lat, lon) {
     const maps = await load();
@@ -170,5 +142,5 @@ const MapsService = (function () {
     });
   }
 
-  return { isConfigured, load, createMap, renderMarkers, drawPolyline, fitToMarkers, centerOnDriver, renderStreetView, drawDrivingRoute };
+  return { isConfigured, load, createMap, renderMarkers, drawPolyline, fitToMarkers, centerOnDriver, renderStreetView };
 })();
