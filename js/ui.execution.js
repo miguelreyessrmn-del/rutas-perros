@@ -10,6 +10,7 @@ const UIExecution = (function () {
   let watchId = null;
   let lastPosition = null;
   let currentStopDest = null; // { lat, lon } — usado para refrescar el mini-mapa cuando llega una nueva posición GPS
+  let gpsAutoStartedForRuta = null; // evita reactivar el GPS si el chofer lo apagó a propósito
 
   function sortedParadas(route) {
     return [...route.paradas].sort((a, b) => a.orden - b.orden);
@@ -24,6 +25,10 @@ const UIExecution = (function () {
     if (!route) {
       container.innerHTML = '';
       return;
+    }
+    if (gpsAutoStartedForRuta !== route.ruta.id) {
+      gpsAutoStartedForRuta = route.ruta.id;
+      startGpsTracking();
     }
     const parada = currentParada(route);
     if (!parada) {
@@ -104,6 +109,8 @@ const UIExecution = (function () {
         ${INCIDENT_TYPES.map((t) => `<button type="button" class="btn-sm exec-incident-chip" data-incident="${esc(t)}">${esc(t)}</button>`).join('')}
       </div>
       <div id="exec-status" class="exec-status"></div>
+
+      <button class="btn-cancel" id="exec-btn-finalizar-ahora" style="margin-top:24px">🏁 Finalizar recorrido y volver al inicio</button>
     `;
 
     wireCurrentStopEvents(route, parada, lat, lon, waPhone, pet);
@@ -194,6 +201,7 @@ const UIExecution = (function () {
     document.querySelectorAll('.exec-incident-chip').forEach((chip) => {
       chip.addEventListener('click', () => reportarIncidencia(parada, route, chip.dataset.incident));
     });
+    document.getElementById('exec-btn-finalizar-ahora').addEventListener('click', finalizarRutaAntesDeTiempo);
     updateGpsStatusUI();
   }
 
@@ -297,14 +305,12 @@ const UIExecution = (function () {
 
   // ── GPS tracking ─────────────────────────────────────────────────────
   function toggleGpsTracking() {
-    if (watchId != null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-      lastPosition = null;
-      lastMapDriverPos = null;
-      updateGpsStatusUI();
-      return;
-    }
+    if (watchId != null) stopGpsTracking();
+    else startGpsTracking();
+  }
+
+  function startGpsTracking() {
+    if (watchId != null) return;
     if (!navigator.geolocation) {
       showToast('Tu navegador no soporta GPS.', 'var(--red)');
       return;
@@ -318,6 +324,15 @@ const UIExecution = (function () {
       () => { updateGpsStatusUI('Permiso de ubicación denegado o GPS no disponible'); },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
     );
+    updateGpsStatusUI();
+  }
+
+  function stopGpsTracking() {
+    if (watchId == null) return;
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    lastPosition = null;
+    lastMapDriverPos = null;
     updateGpsStatusUI();
   }
 
@@ -378,6 +393,24 @@ const UIExecution = (function () {
     AppState.reset();
     UIPlanning.renderAll();
     showToast('✓ Ruta finalizada', '#22c55e');
+  }
+
+  // Permite al chofer cortar el recorrido en cualquier momento (no solo al
+  // terminar todas las paradas): lo que quede pendiente se marca "omitida".
+  async function finalizarRutaAntesDeTiempo() {
+    const route = AppState.activeRoute;
+    if (!route) return;
+    const pendientes = route.paradas.filter((p) => p.estado === 'pendiente' || p.estado === 'en_curso');
+    const ok = confirm(
+      pendientes.length > 0
+        ? `Quedan ${pendientes.length} parada(s) sin completar — se marcarán como omitidas. ¿Terminar el recorrido ahora?`
+        : '¿Terminar el recorrido ahora?'
+    );
+    if (!ok) return;
+    for (const p of pendientes) {
+      await persistParada(p, { estado: 'omitida' });
+    }
+    await finalizarRuta();
   }
 
   return { render };
