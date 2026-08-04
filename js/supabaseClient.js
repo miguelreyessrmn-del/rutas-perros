@@ -1,5 +1,5 @@
 // Inicializa el cliente de Supabase (supabase-js v2, cargado por CDN en index.html).
-// Expone window.sb — usado por petStore.js, storageService.js, routeStore.js, routeService.js.
+// Expone window.sb — usado por petStore.js, storageService.js, routeService.js.
 (function () {
   const cfg = window.PETGROUND_CONFIG || {};
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {

@@ -25,26 +25,7 @@ const App = (function () {
       PetStore.loadFromCache();
     }
     UIPets.renderDirectory();
-    await recoverActiveRoute();
     UIPlanning.init();
-  }
-
-  // Si había una ruta en curso al recargar la página, retoma la ejecución donde iba.
-  async function recoverActiveRoute() {
-    const activeId = RouteStore.getActiveRouteId();
-    if (!activeId) return;
-    try {
-      const { ruta, paradas } = await RouteStore.getRutaConParadas(activeId);
-      if (!ruta || ruta.estado !== 'en_curso') {
-        RouteStore.clearActiveRouteId();
-        return;
-      }
-      const enriched = paradas.map((p) => ({ ...p, pet: PetStore.getById(p.mascota_id) })).sort((a, b) => a.orden - b.orden);
-      AppState.setActiveRoute({ ruta, paradas: enriched });
-      AppState.setStage('ejecucion');
-    } catch (e) {
-      RouteStore.clearActiveRouteId();
-    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

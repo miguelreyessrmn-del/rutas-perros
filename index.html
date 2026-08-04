@@ -69,13 +69,10 @@
 
     <!-- ── Etapa 2: revisión ── -->
     <div id="stage-revision" style="display:none">
-      <div class="section-label">Mapa de la ruta</div>
-      <div id="review-map" class="review-map"></div>
-
       <div id="review-summary" class="review-summary-wrap"></div>
       <div class="warning-box" id="review-warnings"></div>
 
-      <div class="section-label">Paradas</div>
+      <div class="section-label">Paradas <span style="text-transform:none;font-weight:600;letter-spacing:0">(toca una para ver su ficha)</span></div>
       <div id="review-list"></div>
 
       <div class="review-actions">
@@ -89,14 +86,9 @@
         <button class="btn-save" id="btn-apply-review-reorder">Aplicar nuevo orden</button>
       </div>
 
-      <div id="review-started-note"></div>
-
-      <button class="btn-maps" id="btn-start-route" style="width:100%;margin:14px 0 8px">🚀 Iniciar ruta</button>
+      <button class="btn-maps" id="btn-open-maps" style="width:100%;margin:14px 0 8px">📍 Abrir en Google Maps</button>
       <button class="btn-cancel" id="btn-back-to-selection">← Volver a selección</button>
     </div>
-
-    <!-- ── Etapa 3: ejecución paso a paso ── -->
-    <div id="stage-ejecucion" style="display:none"></div>
   </div>
 
   <!-- ══ DIRECTORIO ══ -->
@@ -228,14 +220,11 @@
 <script src="js/supabaseClient.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/storageService.js"></script>
-<script src="js/mapsService.js"></script>
 <script src="js/routeService.js"></script>
 <script src="js/petStore.js"></script>
-<script src="js/routeStore.js"></script>
 <script src="js/state.js"></script>
 <script src="js/ui.pets.js"></script>
 <script src="js/ui.planning.js"></script>
-<script src="js/ui.execution.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

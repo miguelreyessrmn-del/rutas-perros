@@ -18,21 +18,13 @@ const UIPlanning = (function () {
     document.getElementById('btn-recalc-review').addEventListener('click', calcRoute);
     document.getElementById('btn-toggle-reorder').addEventListener('click', toggleReviewReorder);
     document.getElementById('btn-apply-review-reorder').addEventListener('click', applyReviewReorder);
-    document.getElementById('btn-start-route').addEventListener('click', startRoute);
+    document.getElementById('btn-open-maps').addEventListener('click', openInGoogleMaps);
     document.getElementById('origin-input').value = `${AppState.origin.lat}, ${AppState.origin.lon}`;
     tryAutoLocation();
     renderAll();
   }
 
   function renderAll() {
-    if (AppState.stage === 'ejecucion') {
-      document.getElementById('stage-seleccion').style.display = 'none';
-      document.getElementById('stage-revision').style.display = 'none';
-      document.getElementById('stage-ejecucion').style.display = 'block';
-      UIExecution.render();
-      return;
-    }
-    document.getElementById('stage-ejecucion').style.display = 'none';
     const showSelection = AppState.stage === 'seleccion';
     document.getElementById('stage-seleccion').style.display = showSelection ? 'block' : 'none';
     document.getElementById('stage-revision').style.display = showSelection ? 'none' : 'block';
@@ -293,41 +285,22 @@ const UIPlanning = (function () {
     list.innerHTML = '';
     data.stops.forEach((s, i) => {
       const row = document.createElement('div');
-      row.className = 'route-step';
+      row.className = 'route-step route-step-clickable';
+      row.title = 'Ver perfil de ' + s.pet.name;
       const badgeClass = { red: 'badge-alert-red', yellow: 'badge-alert-yellow', green: 'badge-free' }[s.status];
       const badgeText = { red: '⛔ fuera de horario', yellow: '⚠ margen ajustado', green: '✓ en horario' }[s.status];
       const timeStr = s.llegadaEstimada.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
       row.innerHTML = `
         <div class="step-order">${i + 1}</div>
         <div class="step-info">
-          <div class="step-name">${esc(s.pet.name)}</div>
+          <div class="step-name">${esc(s.pet.name)} <span class="step-name-hint">👁 ver perfil</span></div>
           <div class="step-addr">${esc(s.pet.address || 'Sin dirección')}</div>
           <div class="step-badge ${badgeClass}">${badgeText} · llega ~${timeStr}</div>
         </div>
         <div class="step-travel">+${Math.round(s.leg.durationSeconds / 60)} min<br>${(s.leg.distanceMeters / 1000).toFixed(1)} km</div>`;
+      row.addEventListener('click', () => UIPets.openProfile(s.pet.id));
       list.appendChild(row);
     });
-
-    renderReviewMap(data);
-  }
-
-  async function renderReviewMap(data) {
-    const container = document.getElementById('review-map');
-    if (!MapsService.isConfigured()) {
-      container.innerHTML = '<div class="hint-box">🗺️ Configura GOOGLE_MAPS_BROWSER_KEY en js/config.js para ver el mapa aquí.</div>';
-      return;
-    }
-    try {
-      await MapsService.createMap(container, { lat: AppState.origin.lat, lng: AppState.origin.lon });
-      const points = [
-        { lat: AppState.origin.lat, lon: AppState.origin.lon, label: 'Origen', status: 'origin' },
-        ...data.stops.map((s, i) => ({ lat: s.pet.lat, lon: s.pet.lon, label: s.pet.name, status: 'pending', orderLabel: i + 1 }))
-      ];
-      MapsService.renderMarkers(points);
-      MapsService.drawPolyline(data.polyline);
-    } catch (e) {
-      container.innerHTML = `<div class="hint-box">No se pudo cargar el mapa: ${esc(e.message)}</div>`;
-    }
   }
 
   function toggleReviewReorder() {
@@ -345,51 +318,21 @@ const UIPlanning = (function () {
     renderAll();
   }
 
-  async function startRoute() {
+  // Abre la ruta completa (origen + todas las paradas, en el orden ya calculado)
+  // en la app de Google Maps y regresa a la pantalla de selección.
+  function openInGoogleMaps() {
     const data = AppState.reviewData;
-    if (!data) return;
-    const btn = document.getElementById('btn-start-route');
-    btn.disabled = true;
-    btn.textContent = 'Iniciando…';
-    try {
-      let cumMeters = 0;
-      let cumSeconds = 0;
-      const paradas = data.stops.map((s, i) => {
-        cumMeters += s.leg.distanceMeters;
-        cumSeconds += s.leg.durationSeconds;
-        return {
-          mascotaId: s.pet.id,
-          orden: i + 1,
-          distanciaMetros: s.leg.distanceMeters,
-          duracionSegundos: s.leg.durationSeconds,
-          llegadaEstimada: s.llegadaEstimada,
-          lat: s.pet.lat,
-          lon: s.pet.lon,
-          direccion: s.pet.address
-        };
-      });
-      const { ruta, paradas: paradasGuardadas } = await RouteStore.crearRutaConParadas({
-        tipo: AppState.mode,
-        origen: AppState.origin,
-        distanciaTotalMetros: data.distanceMeters,
-        duracionTotalSegundos: data.durationSeconds,
-        polyline: data.polyline,
-        paradas
-      });
-      const enriched = paradasGuardadas
-        .map((p) => ({ ...p, pet: PetStore.getById(p.mascota_id) }))
-        .sort((a, b) => a.orden - b.orden);
-      AppState.setActiveRoute({ ruta, paradas: enriched });
-      RouteStore.setActiveRouteId(ruta.id);
-      AppState.setStage('ejecucion');
-      showToast('✓ Ruta iniciada', '#22c55e');
-      renderAll();
-    } catch (e) {
-      showToast('Error al iniciar la ruta: ' + e.message, 'var(--red)');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '🚀 Iniciar ruta';
-    }
+    if (!data || data.stops.length === 0) return;
+    const origin = `${AppState.origin.lat},${AppState.origin.lon}`;
+    const points = data.stops.map((s) => `${s.pet.lat},${s.pet.lon}`);
+    const destination = points[points.length - 1];
+    const waypoints = points.slice(0, -1);
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    if (waypoints.length > 0) url += `&waypoints=${encodeURIComponent(waypoints.join('|'))}`;
+    window.open(url, '_blank');
+    showToast('✓ Ruta abierta en Google Maps', '#22c55e');
+    AppState.reset();
+    renderAll();
   }
 
   function setStatus(msg, color) {

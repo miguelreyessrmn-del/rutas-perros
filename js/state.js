@@ -7,9 +7,8 @@ const AppState = (function () {
   let manualOrder = []; // copia reordenable para el modo manual
   let mode = 'optimizada'; // 'optimizada' | 'seleccion' | 'manual'
   let origin = { lat: 19.05101951225774, lon: -98.23568593352047, label: 'PetGround (base)' };
-  let stage = 'seleccion'; // 'seleccion' | 'revision' | 'ejecucion'
+  let stage = 'seleccion'; // 'seleccion' | 'revision'
   let reviewData = null; // resultado normalizado de RouteService.computeRoute + horarios
-  let activeRoute = null; // { ruta, paradas: [ {...fila ruta_paradas, pet} ] } — ruta en curso
 
   function select(id) {
     if (selectedIds.has(id)) return;
@@ -71,20 +70,6 @@ const AppState = (function () {
     mode = 'optimizada';
     stage = 'seleccion';
     reviewData = null;
-    activeRoute = null;
-  }
-
-  function setActiveRoute(data) {
-    activeRoute = data;
-  }
-  function updateActiveParada(paradaId, patch) {
-    if (!activeRoute) return null;
-    const p = activeRoute.paradas.find((x) => String(x.id) === String(paradaId));
-    if (p) Object.assign(p, patch);
-    return p || null;
-  }
-  function clearActiveRoute() {
-    activeRoute = null;
   }
 
   return {
@@ -95,7 +80,6 @@ const AppState = (function () {
     get origin() { return origin; },
     get stage() { return stage; },
     get reviewData() { return reviewData; },
-    get activeRoute() { return activeRoute; },
     select,
     deselect,
     toggle,
@@ -107,9 +91,6 @@ const AppState = (function () {
     setOrigin,
     setStage,
     setReviewData,
-    setActiveRoute,
-    updateActiveParada,
-    clearActiveRoute,
     orderedIdsForMode,
     reset
   };
